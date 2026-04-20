@@ -2,18 +2,81 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>CRM Dashboard</title>
+<title>نظام إدارة العملاء</title>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;600&display=swap" rel="stylesheet">
 
 <style>
-body{background:#0f172a;color:#fff;font-family:system-ui;margin:0}
-.container{max-width:1200px;margin:auto;padding:20px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px}
-.card{background:#111827;padding:15px;border-radius:15px}
-input,textarea{width:100%;margin:5px 0;padding:10px;border-radius:10px;border:none}
-button{padding:10px;border:none;border-radius:10px;cursor:pointer}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;margin-top:20px}
+body {
+    font-family: 'Cairo', sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    margin: 0;
+    color: #fff;
+}
+
+.container {
+    width: 90%;
+    margin: auto;
+}
+
+h1 {
+    text-align: center;
+}
+
+.card {
+    background: rgba(255,255,255,0.1);
+    padding: 20px;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    margin-bottom: 20px;
+}
+
+input {
+    width: 23%;
+    padding: 10px;
+    margin: 5px;
+    border-radius: 10px;
+    border: none;
+}
+
+button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 10px;
+    background: #00c9a7;
+    color: white;
+    cursor: pointer;
+}
+
+table {
+    width: 100%;
+    background: white;
+    color: black;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+th, td {
+    padding: 10px;
+    text-align: center;
+}
+
+th {
+    background: #6c5ce7;
+    color: white;
+}
+
+.stats {
+    display: flex;
+    justify-content: space-around;
+}
+
+.stat-box {
+    background: rgba(255,255,255,0.2);
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+}
 </style>
 </head>
 
@@ -21,153 +84,111 @@ button{padding:10px;border:none;border-radius:10px;cursor:pointer}
 
 <div class="container">
 
-<h1>📊 Dashboard</h1>
+<h1>📊 نظام إدارة العملاء</h1>
 
-<div class="grid">
-  <div class="card">👥 العملاء: <span id="total">0</span></div>
-  <div class="card">📝 عندهم ملاحظات: <span id="notesCount">0</span></div>
-</div>
-
-<canvas id="chart" height="100"></canvas>
-
-<hr>
-
-<h2>إضافة عميل</h2>
-
-<input id="name" placeholder="الاسم">
+<div class="card">
+<input id="name" placeholder="اسم العميل">
 <input id="phone" placeholder="الموبايل">
 <input id="email" placeholder="الإيميل">
-<textarea id="notes" placeholder="ملاحظات"></textarea>
-<button onclick="addClient()">حفظ</button>
+<input id="notes" placeholder="ملاحظات">
 
-<input id="search" placeholder="بحث..." oninput="render()">
+<button onclick="addClient()">➕ إضافة</button>
+</div>
 
-<div class="cards" id="cards"></div>
+<div class="card">
+<input id="search" placeholder="بحث..." onkeyup="searchClient()">
+</div>
+
+<div class="card stats">
+<div class="stat-box">
+<h3 id="total">0</h3>
+<p>عدد العملاء</p>
+</div>
+</div>
+
+<div class="card">
+<table>
+<thead>
+<tr>
+<th>الاسم</th>
+<th>الموبايل</th>
+<th>الإيميل</th>
+<th>ملاحظات</th>
+<th>إجراءات</th>
+</tr>
+</thead>
+<tbody id="table"></tbody>
+</table>
+</div>
 
 </div>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+
 <script>
-const API = "/api/clients";
-let editId = null;
-let chart;
 
-// إضافة / تعديل
-async function addClient(){
-  const name = nameEl.value;
-  const phone = phoneEl.value;
-  const email = emailEl.value;
-  const notes = notesEl.value;
+// 🔥 حطي بيانات Firebase هنا
+const firebaseConfig = {
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_ID",
+};
 
-  if(!name || !phone || !email) return alert("املأ البيانات");
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-  if(editId){
-    await fetch(API,{
-      method:"PUT",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({id:editId,name,phone,email,notes})
+// ➕ إضافة
+function addClient() {
+    const name = document.getElementById("name").value;
+    const phone = document.getElementById("phone").value;
+    const email = document.getElementById("email").value;
+    const notes = document.getElementById("notes").value;
+
+    db.collection("clients").add({
+        name, phone, email, notes
     });
-    editId=null;
-  }else{
-    await fetch(API,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({name,phone,email,notes})
+}
+
+// 📥 تحميل البيانات
+db.collection("clients").onSnapshot(snapshot => {
+    let table = document.getElementById("table");
+    table.innerHTML = "";
+
+    document.getElementById("total").innerText = snapshot.size;
+
+    snapshot.forEach(doc => {
+        let data = doc.data();
+
+        table.innerHTML += `
+        <tr>
+        <td>${data.name}</td>
+        <td>${data.phone}</td>
+        <td>${data.email}</td>
+        <td>${data.notes}</td>
+        <td>
+        <button onclick="deleteClient('${doc.id}')">🗑</button>
+        </td>
+        </tr>`;
     });
-  }
+});
 
-  clearForm();
-  render();
+// 🗑 حذف
+function deleteClient(id) {
+    db.collection("clients").doc(id).delete();
 }
 
-// حذف
-async function deleteClient(id){
-  await fetch(API+"?id="+id,{method:"DELETE"});
-  render();
+// 🔍 بحث
+function searchClient() {
+    let input = document.getElementById("search").value.toLowerCase();
+    let rows = document.querySelectorAll("tbody tr");
+
+    rows.forEach(row => {
+        row.style.display = row.innerText.toLowerCase().includes(input) ? "" : "none";
+    });
 }
 
-// تعديل
-function editClient(c){
-  nameEl.value=c.name;
-  phoneEl.value=c.phone;
-  emailEl.value=c.email;
-  notesEl.value=c.notes||"";
-  editId=c._id;
-}
-
-// عرض
-async function render(){
-  const res = await fetch(API);
-  const data = await res.json();
-
-  const search = searchEl.value.toLowerCase();
-
-  cards.innerHTML="";
-
-  let notesCount=0;
-
-  data.forEach(c=>{
-    if(c.notes) notesCount++;
-
-    if(
-      c.name.toLowerCase().includes(search) ||
-      c.phone.toLowerCase().includes(search) ||
-      c.email.toLowerCase().includes(search)
-    ){
-      cards.innerHTML += `
-      <div class="card">
-        <h3>${c.name}</h3>
-        <p>${c.phone}</p>
-        <p>${c.email}</p>
-        <p>${c.notes||"-"}</p>
-        <button onclick='editClient(${JSON.stringify(c)})'>تعديل</button>
-        <button onclick="deleteClient('${c._id}')">حذف</button>
-      </div>`;
-    }
-  });
-
-  total.innerText = data.length;
-  notesCountEl.innerText = notesCount;
-
-  drawChart(data);
-}
-
-// رسم
-function drawChart(data){
-  const days = {};
-  data.forEach(()=> {
-    const d = new Date().toLocaleDateString();
-    days[d] = (days[d]||0)+1;
-  });
-
-  const labels = Object.keys(days);
-  const values = Object.values(days);
-
-  if(chart) chart.destroy();
-
-  chart = new Chart(document.getElementById("chart"),{
-    type:"bar",
-    data:{labels,datasets:[{label:"عدد العملاء",data:values}]}
-  });
-}
-
-// عناصر
-const nameEl = document.getElementById("name");
-const phoneEl = document.getElementById("phone");
-const emailEl = document.getElementById("email");
-const notesEl = document.getElementById("notes");
-const cards = document.getElementById("cards");
-const searchEl = document.getElementById("search");
-const total = document.getElementById("total");
-const notesCountEl = document.getElementById("notesCount");
-
-function clearForm(){
-  nameEl.value="";
-  phoneEl.value="";
-  emailEl.value="";
-  notesEl.value="";
-}
-
-render();
 </script>
 
 </body>
